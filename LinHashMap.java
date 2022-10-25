@@ -14,282 +14,353 @@ import java.util.*;
  * This class provides hash maps that use the Linear Hashing algorithm.
  * A hash table is created that is an expandable array-list of buckets.
  */
-public class LinHashMap <K, V>
-       extends AbstractMap <K, V>
-       implements Serializable, Cloneable, Map <K, V>
-{
-    /** The debug flag
+public class LinHashMap<K, V>
+        extends AbstractMap<K, V>
+        implements Serializable, Cloneable, Map<K, V> {
+    /**
+     * The debug flag
      */
     private static final boolean DEBUG = true;
 
-    /** The number of slots (for key-value pairs) per bucket.
+    /**
+     * The number of slots (for key-value pairs) per bucket.
      */
     private static final int SLOTS = 4;
 
-    /** The threshold/upper bound on the load factor
+    /**
+     * The threshold/upper bound on the load factor
      */
     private static final double THRESHOLD = 1.2;
 
-    /** The class for type K.
+    /**
+     * The class for type K.
      */
-    private final Class <K> classK;
+    private final Class<K> classK;
 
-    /** The class for type V.
+    /**
+     * The class for type V.
      */
-    private final Class <V> classV;
+    private final Class<V> classV;
 
     /********************************************************************************
      * This inner class defines buckets that are stored in the hash table.
      */
-    private class Bucket
-    {
-        int    nKeys;
-        K []   key;
-        V []   value;
+    private class Bucket {
+        int nKeys;
+        K[] key;
+        V[] value;
         Bucket next;
 
         @SuppressWarnings("unchecked")
-        Bucket ()
-        {
+        Bucket() {
             nKeys = 0;
-            key   = (K []) Array.newInstance (classK, SLOTS);
-            value = (V []) Array.newInstance (classV, SLOTS);
-            next  = null;
+            key = (K[]) Array.newInstance(classK, SLOTS);
+            value = (V[]) Array.newInstance(classV, SLOTS);
+            next = null;
         } // constructor
 
-        V find (K k)
-        {
-            for (var j = 0; j < nKeys; j++) if (key[j].equals (k)) return value[j];
+        V find(K k) {
+            for (var j = 0; j < nKeys; j++)
+                if (key[j].equals(k))
+                    return value[j];
             return null;
         } // find
 
-        void add (K k, V v)
-        {
-            key[nKeys]   = k;
+        void add(K k, V v) {
+            key[nKeys] = k;
             value[nKeys] = v;
             nKeys++;
         } // add
 
-        void print ()
-        {
-            out.print ("[ " );
-            for (var j = 0; j < nKeys; j++) out.print (key[j] + " . ");
-            out.println ("]" );
+        void print() {
+            out.print("[ ");
+            for (var j = 0; j < nKeys; j++)
+                out.print(key[j] + " . ");
+            out.println("]");
         } // print
 
     } // Bucket inner class
 
-    /** The list of buckets making up the hash table.
+    /**
+     * The list of buckets making up the hash table.
      */
-    private final List <Bucket> hTable;
+    private final List<Bucket> hTable;
 
-    /** The modulus for low resolution hashing
+    /**
+     * The modulus for low resolution hashing
      */
     private int mod1;
 
-    /** The modulus for high resolution hashing
+    /**
+     * The modulus for high resolution hashing
      */
     private int mod2;
 
-    /** The index of the next bucket to split.
+    /**
+     * The index of the next bucket to split.
      */
     private int isplit = 0;
 
-    /** Counter for the number buckets accessed (for performance testing).
+    /**
+     * Counter for the number buckets accessed (for performance testing).
      */
     private int count = 0;
 
-    /** The counter for the total number of keys in the LinHash Map
+    /**
+     * The counter for the total number of keys in the LinHash Map
      */
     private int keyCount = 0;
 
     /********************************************************************************
      * Construct a hash table that uses Linear Hashing.
-     * @param classK  the class for keys (K)
-     * @param classV  the class for values (V)
+     * 
+     * @param classK the class for keys (K)
+     * @param classV the class for values (V)
      */
-    public LinHashMap (Class <K> _classK, Class <V> _classV)
-    {
+    public LinHashMap(Class<K> _classK, Class<V> _classV) {
         classK = _classK;
         classV = _classV;
-        mod1   = 4;                                                          // initial size
-        mod2   = 2 * mod1;
-        hTable = new ArrayList <> ();
-        for (var i = 0; i < mod1; i++) hTable.add (new Bucket ());
+        mod1 = 4; // initial size
+        mod2 = 2 * mod1;
+        hTable = new ArrayList<>();
+        for (var i = 0; i < mod1; i++)
+            hTable.add(new Bucket());
     } // constructor
 
     /********************************************************************************
      * Return a set containing all the entries as pairs of keys and values.
-     * @return  the set view of the map
+     * 
+     * @author Obi Nnaduruaku
+     * @return the set view of the map
      */
-    public Set <Map.Entry <K, V>> entrySet ()
-    {
-        var enSet = new HashSet <Map.Entry <K, V>> ();
+    public Set<Map.Entry<K, V>> entrySet() {
+        var enSet = new HashSet<Map.Entry<K, V>>();
+        for (var i = 0; i < this.hTable.size(); i++) {
+            // get current bucket
+            var currBucket = this.hTable.get(i);
 
-        //  T O   B E   I M P L E M E N T E D
-            
+            /*
+             * for each key in the bucket, we get the corresponding value, and
+             * create the entry with these values
+             * move to next overflow bucket if applicable
+             */
+
+            while (currBucket != null) {
+                for (int j = 0; j < currBucket.nKeys; j++) {
+                    Entry<K, V> entry = (Entry<K, V>) Map.entry(currBucket.key[j], currBucket.value[j]);
+                    enSet.add(entry);
+                }
+                currBucket = currBucket.next;
+            }
+
+        }
         return enSet;
     } // entrySet
 
     /********************************************************************************
      * Given the key, look up the value in the hash table.
-     * @param key  the key used for look up
-     * @return  the value associated with the key
+     * 
+     * @param key the key used for look up
+     * @return the value associated with the key
      */
     @SuppressWarnings("unchecked")
-    public V get (Object key)
-    {
-        var i = h (key);
-        return find ((K) key, hTable.get (i), true);
+    public V get(Object key) {
+        var i = h(key);
+        return find((K) key, hTable.get(i), true);
     } // get
 
     /********************************************************************************
-     * Put the key-value pair in the hash table.  Split the 'isplit' bucket chain
+     * Put the key-value pair in the hash table. Split the 'isplit' bucket chain
      * when the load factor is exceeded.
-     * @param key    the key to insert
-     * @param value  the value to insert
-     * @return  the old/previous value, null if none
+     * 
+     * @param key   the key to insert
+     * @param value the value to insert
+     * @return the old/previous value, null if none
      */
-    public V put (K key, V value)
-    {
-        var i    = h (key);                                                  // hash to i-th bucket chain
-        var bh   = hTable.get (i);                                           // start with home bucket
-        var oldV = find (key, bh, false);                                    // find old value associated with key
-        out.println ("LinearHashMap.put: key = " + key + ", h() = " + i + ", value = " + value);
+    public V put(K key, V value) {
+        var i = h(key); // hash to i-th bucket chain
+        var bh = hTable.get(i); // start with home bucket
+        var oldV = find(key, bh, false); // find old value associated with key
+        out.println("LinearHashMap.put: key = " + key + ", h() = " + i + ", value = " + value);
 
-        keyCount++;                                                          // increment the key count
-        var lf = loadFactor ();                                              // compute the load factor
-        if (DEBUG) out.println ("put: load factor = " + lf);
-        if (lf > THRESHOLD) split ();                                        // split beyond THRESHOLD
+        keyCount++; // increment the key count
+        var lf = loadFactor(); // compute the load factor
+        if (DEBUG)
+            out.println("put: load factor = " + lf);
+        if (lf > THRESHOLD)
+            split(); // split beyond THRESHOLD
 
         var b = bh;
-        while (true)  {
-            if (b.nKeys < SLOTS) { b.add (key, value); return oldV; }
-            if (b.next != null) b = b.next; else break;
+        while (true) {
+            if (b.nKeys < SLOTS) {
+                b.add(key, value);
+                return oldV;
+            }
+            if (b.next != null)
+                b = b.next;
+            else
+                break;
         } // while
 
-        var bn = new Bucket ();
-        bn.add (key, value);
-        b.next = bn;                                                         // add new bucket at end of chain
+        var bn = new Bucket();
+        bn.add(key, value);
+        b.next = bn; // add new bucket at end of chain
         return oldV;
     } // put
 
     /********************************************************************************
      * Print the hash table.
      */
-    public void print ()
-    {
-        out.println ("LinHashMap");
-        out.println ("-------------------------------------------");
+    public void print() {
+        out.println("LinHashMap");
+        out.println("-------------------------------------------");
 
-        for (var i = 0; i < hTable.size (); i++) {
-            out.print ("Bucket [ " + i + " ] = ");
+        for (var i = 0; i < hTable.size(); i++) {
+            out.print("Bucket [ " + i + " ] = ");
             var j = 0;
-            for (var b = hTable.get (i); b != null; b = b.next) {
-                if (j > 0) out.print (" \t\t --> ");
-                b.print ();
+            for (var b = hTable.get(i); b != null; b = b.next) {
+                if (j > 0)
+                    out.print(" \t\t --> ");
+                b.print();
                 j++;
             } // for
         } // for
 
-        out.println ("-------------------------------------------");
+        out.println("-------------------------------------------");
     } // print
- 
+
     /********************************************************************************
-     * Return the size (SLOTS * number of home buckets) of the hash table. 
-     * @return  the size of the hash table
+     * Return the size (SLOTS * number of home buckets) of the hash table.
+     * 
+     * @return the size of the hash table
      */
-    public int size ()
-    {
+    public int size() {
         return SLOTS * (mod1 + isplit);
     } // size
 
     /********************************************************************************
      * Split bucket chain 'isplit' by creating a new bucket chain at the end of the
      * hash table and redistributing the keys according to the high resolution hash
-     * function 'h2'.  Increment 'isplit'.  If current split phase is complete,
+     * function 'h2'. Increment 'isplit'. If current split phase is complete,
      * reset 'isplit' to zero, and update the hash functions.
+     * 
+     * NEEDS WORK
      */
-    private void split ()
-    {
-        out.println ("split: bucket chain " + isplit);
+    private void split() {
+        out.println("split: bucket chain " + isplit);
 
-        //  T O   B E   I M P L E M E N T E D
+        // create a new bucket and add it to the end of the map
+        this.hTable.add(new Bucket());
 
+        // find the isplit bucket
+        var bucketToSplit = this.hTable.get(isplit);
+        while (bucketToSplit.key[0] != null) {
+            for (int j = 0; j < bucketToSplit.nKeys; j++) {
+                var x = h2(bucketToSplit.key[j]);
+                var startBucket = this.hTable.get(x); // start with home bucket
+                var oldV = find(bucketToSplit.key[j], startBucket, false); // find old value associated with key
+                var startB = startBucket;
+                var newBucket = new Bucket();
+                while (true) {
+                    if (startB.nKeys < SLOTS) {
+                        startB.add(bucketToSplit.key[j], oldV);
+                    }
+                    if (startB.next != null)
+                        startB = startB.next;
+                    else
+                        newBucket.add(bucketToSplit.key[j], oldV);
+                    startB.next = newBucket; // add new bucket at end of chain
+                } // while
+            }
+            bucketToSplit = bucketToSplit.next;
+        }
+
+        // T O B E I M P L E M E N T E D
+
+        this.isplit++;
     } // split
 
     /********************************************************************************
      * Return the load factor for the hash table.
-     * @return  the load factor
+     * 
+     * @return the load factor
      */
-    private double loadFactor ()
-    {
-        return keyCount / (double) size ();
+    private double loadFactor() {
+        return keyCount / (double) size();
     } // loadFactor
 
     /********************************************************************************
      * Find the key in the bucket chain that starts with home bucket bh.
-     * @param key     the key to find
-     * @param bh      the given home bucket
-     * @param by_get  whether 'find' is called from 'get' (performance monitored)
-     * @return  the current value stored stored for the key
+     * 
+     * @param key    the key to find
+     * @param bh     the given home bucket
+     * @param by_get whether 'find' is called from 'get' (performance monitored)
+     * @return the current value stored stored for the key
      */
-    private V find (K key, Bucket bh, boolean by_get)
-    {
+    private V find(K key, Bucket bh, boolean by_get) {
         for (var b = bh; b != null; b = b.next) {
-            if (by_get) count++;
-            V result = b.find (key);
-            if (result != null) return result;
+            if (by_get)
+                count++;
+            V result = b.find(key);
+            if (result != null)
+                return result;
         } // for
         return null;
     } // find
 
     /********************************************************************************
      * Hash the key using the low resolution hash function.
-     * @param key  the key to hash
-     * @return  the location of the bucket chain containing the key-value pair
+     * 
+     * @param key the key to hash
+     * @return the location of the bucket chain containing the key-value pair
      */
-    private int h (Object key)
-    {
-        return key.hashCode () % mod1;
+    private int h(Object key) {
+        return key.hashCode() % mod1;
     } // h
 
     /********************************************************************************
      * Hash the key using the high resolution hash function.
-     * @param key  the key to hash
-     * @return  the location of the bucket chain containing the key-value pair
+     * 
+     * @param key the key to hash
+     * @return the location of the bucket chain containing the key-value pair
      */
-    private int h2 (Object key)
-    {
-        return key.hashCode () % mod2;
+    private int h2(Object key) {
+        return key.hashCode() % mod2;
     } // h2
 
     /********************************************************************************
      * The main method used for testing.
-     * @param  the command-line arguments (args [0] gives number of keys to insert)
+     * 
+     * @param the command-line arguments (args [0] gives number of keys to insert)
      */
-    public static void main (String [] args)
-    {
-        var totalKeys = 40;
-        var RANDOMLY  = false;
+    public static void main(String[] args) {
+        var totalKeys = 50;
+        var RANDOMLY = false;
 
-        LinHashMap <Integer, Integer> ht = new LinHashMap <> (Integer.class, Integer.class);
-        if (args.length == 1) totalKeys = Integer.valueOf (args [0]);
+        LinHashMap<Integer, Integer> ht = new LinHashMap<>(Integer.class, Integer.class);
+        if (args.length == 1)
+            totalKeys = Integer.valueOf(args[0]);
 
         if (RANDOMLY) {
-            var rng = new Random ();
-            for (var i = 1; i <= totalKeys; i += 2) ht.put (rng.nextInt (2 * totalKeys), i * i);
+            var rng = new Random();
+            for (var i = 1; i <= totalKeys; i += 2)
+                ht.put(rng.nextInt(2 * totalKeys), i * i);
         } else {
-            for (var i = 1; i <= totalKeys; i += 2) ht.put (i, i * i);
+            for (var i = 1; i <= totalKeys; i += 2)
+                ht.put(i, i * i);
         } // if
 
-        ht.print ();
+        ht.print();
         for (var i = 0; i <= totalKeys; i++) {
-            out.println ("key = " + i + " value = " + ht.get (i));
+            out.println("key = " + i + " value = " + ht.get(i));
         } // for
-        out.println ("-------------------------------------------");
-        out.println ("Average number of buckets accessed = " + ht.count / (double) totalKeys);
+        out.println("-------------------------------------------");
+        out.println("Average number of buckets accessed = " + ht.count / (double) totalKeys);
+
+        Set<Map.Entry<Integer, Integer>> testEntrySet = ht.entrySet();
+        System.out.println();
+        System.out.println("Testing entrySet()");
+        System.out.println(testEntrySet);
     } // main
 
 } // LinHashMap class
-
