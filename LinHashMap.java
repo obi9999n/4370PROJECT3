@@ -166,6 +166,11 @@ public class LinHashMap<K, V>
     @SuppressWarnings("unchecked")
     public V get(Object key) {
         var i = h(key);
+        // Modification to adhere to algorithm
+        if (i < isplit) {
+            i = h2(key);
+        } // hash to i-th bucket chain
+          // end modification
         return find((K) key, hTable.get(i), true);
     } // get
 
@@ -178,7 +183,12 @@ public class LinHashMap<K, V>
      * @return the old/previous value, null if none
      */
     public V put(K key, V value) {
-        var i = h(key); // hash to i-th bucket chain
+        var i = h(key);
+        // Modification to adhere to algorithm
+        if (i < isplit) {
+            i = h2(key);
+        } // hash to i-th bucket chain
+          // end modification
         var bh = hTable.get(i); // start with home bucket
         var oldV = find(key, bh, false); // find old value associated with key
         out.println("LinearHashMap.put: key = " + key + ", h() = " + i + ", value = " + value);
@@ -244,7 +254,7 @@ public class LinHashMap<K, V>
      * function 'h2'. Increment 'isplit'. If current split phase is complete,
      * reset 'isplit' to zero, and update the hash functions.
      * 
-     * NEEDS WORK
+     * @Author Obi Nnaduruaku
      */
     private void split() {
         out.println("split: bucket chain " + isplit);
@@ -253,29 +263,62 @@ public class LinHashMap<K, V>
         this.hTable.add(new Bucket());
 
         // find the isplit bucket
+        if (isplit == mod2) {
+            mod1 = mod2;
+            mod2 = mod2 * 2;
+            isplit = 0;
+        }
         var bucketToSplit = this.hTable.get(isplit);
-        while (bucketToSplit.key[0] != null) {
-            for (int j = 0; j < bucketToSplit.nKeys; j++) {
-                var x = h2(bucketToSplit.key[j]);
-                var startBucket = this.hTable.get(x); // start with home bucket
-                var oldV = find(bucketToSplit.key[j], startBucket, false); // find old value associated with key
-                var startB = startBucket;
+        while (bucketToSplit != null) {
+            int incrementKV = 0;
+            K[] key1 = (K[]) Array.newInstance(classK, SLOTS);
+            V[] value1 = (V[]) Array.newInstance(classV, SLOTS);
+
+            for (int j = 0; j < bucketToSplit.nKeys; j++) { // for each key in current bucket
+                var x = h2(bucketToSplit.key[j]); // get x'th position of bucket to insert key
+                var destBucket = this.hTable.get(x); // destination bucket for key
+                var oldV = find(bucketToSplit.key[j], bucketToSplit, false); // find old value associated with key
+
+                var startB = destBucket;
+                // incase we need a new bucket
                 var newBucket = new Bucket();
-                while (true) {
-                    if (startB.nKeys < SLOTS) {
-                        startB.add(bucketToSplit.key[j], oldV);
-                    }
-                    if (startB.next != null)
-                        startB = startB.next;
-                    else
-                        newBucket.add(bucketToSplit.key[j], oldV);
-                    startB.next = newBucket; // add new bucket at end of chain
-                } // while
+                boolean change = false;
+                if (x != isplit) {
+                    while (change == false) {
+                        if (startB.nKeys < SLOTS) {
+                            System.out.println(bucketToSplit.key[j] + " moved");
+                            startB.add(bucketToSplit.key[j], oldV);
+                            change = true;
+                        } else if (startB.next != null)
+                            // move to the next bucket if current one is full
+                            startB = startB.next;
+                        else {
+                            System.out.println(bucketToSplit.key[j] + " moved");
+                            newBucket.add(bucketToSplit.key[j], oldV);
+                            change = true;
+                            startB.next = newBucket; // add new bucket at end of chain
+                        }
+
+                    } // while
+                } else {
+                    // create new bucket key value pair arrays for post split
+                    key1[incrementKV] = bucketToSplit.key[j];
+                    value1[incrementKV] = oldV;
+                    incrementKV++;
+                }
+
+            }
+            // move to the next bucket
+            bucketToSplit.key = key1;
+            bucketToSplit.value = value1;
+            if (bucketToSplit.nKeys != 0) {
+                // determine length for key length of bucket to avoid null pointers
+                bucketToSplit.nKeys = incrementKV;
+            } else {
+                bucketToSplit.nKeys = 0;
             }
             bucketToSplit = bucketToSplit.next;
         }
-
-        // T O B E I M P L E M E N T E D
 
         this.isplit++;
     } // split
@@ -334,7 +377,7 @@ public class LinHashMap<K, V>
      * @param the command-line arguments (args [0] gives number of keys to insert)
      */
     public static void main(String[] args) {
-        var totalKeys = 50;
+        var totalKeys = 300;
         var RANDOMLY = false;
 
         LinHashMap<Integer, Integer> ht = new LinHashMap<>(Integer.class, Integer.class);
