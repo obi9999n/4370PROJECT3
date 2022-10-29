@@ -80,19 +80,20 @@ public class Table
      * The supported map types.
      */
     private enum MapType {
-        NO_MAP, TREE_MAP, LINHASH_MAP, BPTREE_MAP
+        NO_MAP, TREE_MAP, LINHASH_MAP, BPTREE_MAP, HASH_MAP
     }
 
     /**
      * The map type to be used for indices. Change as needed.
      */
-    private static final MapType mType = MapType.TREE_MAP;
+    private static final MapType mType = MapType.NO_MAP;
 
     /************************************************************************************
      * Make a map (index) given the MapType.
      */
     private static Map<KeyType, Comparable[]> makeMap() {
         return switch (mType) {
+            case HASH_MAP -> new HashMap<>();
             case TREE_MAP -> new TreeMap<>();
             case LINHASH_MAP -> new LinHashMap<>(KeyType.class, Comparable[].class);
             default -> null;

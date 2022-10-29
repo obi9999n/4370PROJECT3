@@ -7,6 +7,9 @@
 
 import static java.lang.System.out;
 
+import java.time.Duration;
+import java.time.Instant;
+
 /*****************************************************************************************
  * This class tests the TupleGenerator on the Student Registration Database defined in the
  * Kifer, Bernstein and Lewis 2006 database textbook (see figure 3.6).  The primary keys
@@ -68,6 +71,8 @@ public class TestTupleGenerator
     
         var resultTest = test.generate (tups);
         init(resultTest);
+        out.println("Data setup complete...");
+        run();
         
     } // main
     
@@ -119,17 +124,31 @@ public class TestTupleGenerator
                 //     out.print (resultTest [i][j][k] + ",");
                     
                 // } // for
-                out.println ();
+                // out.println ();
             } // for
-            out.println ();
+            // out.println ();
         } // for
     }
 
 
-    private void run(Comparable[][][] tuples)
+    private static void run()
     {
-        // populate tables
-        // init();
+        Instant startTime;
+        Instant stopTime;
+
+        // Student select
+        startTime = Instant.now();
+        Table t = student.project("id");
+        stopTime = Instant.now();
+        
+        t.print();
+        printMetric(startTime, stopTime);
+    }
+
+    private static void printMetric(Instant startTime, 
+                                    Instant stopTime) {
+        out.println();
+        out.println("Duration> " + Duration.between(startTime, stopTime).getNano());
     }
 
 } // TestTupleGenerator
