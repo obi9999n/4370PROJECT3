@@ -239,18 +239,47 @@ public class Table
      */
     public Table select(KeyType keyVal) {
         out.println("RA> " + name + ".select (" + keyVal + ")");
+        out.println("J5_2> " + name + ".select (" + keyVal + ")");
 
         List<Comparable[]> rows = new ArrayList<>();
-        // use keyVal to get correct entry from table, add it to rows
 
-        for (Comparable[] entry : this.tuples) {
-            if (this.index.get(keyVal) == entry) {
-                rows.add(entry);
-                break;
-            }
+        // T O B E I M P L E M E N T E D
+        if (mType == MapType.NO_MAP) {
+            return nonIndexSelect(keyVal);
         }
+        else {
+            Comparable[] r = this.index.get(keyVal);
+            if (r != null) rows.add(r);
+        } // if
+
+        // rows.add(null);
         return new Table(name + count++, attribute, domain, key, rows);
     } // select
+
+    public Table nonIndexSelect(KeyType keyVal)
+    {
+        ArrayList<Integer> keyIndexes = new ArrayList<Integer>();
+        HashSet keyNames = new HashSet(Arrays.asList(key));
+        for(int i = 0; i < attribute.length; i++){
+            if(keyNames.contains(attribute[i])){
+                keyIndexes.add(i);
+            }
+        }
+        List<Comparable[]> rows = new ArrayList<>();
+        for(int i = 0; i < tuples.size(); i++){
+            Comparable[] currentTuple = tuples.get(i);
+            List<Comparable> keyValues = new ArrayList<Comparable>();
+            for(int j = 0; j < keyIndexes.size(); j++){
+                keyValues.add(currentTuple[keyIndexes.get(j)]);
+            }
+            KeyType keyToCompare = new KeyType(keyValues.toArray(new Comparable[0]));
+            if(keyToCompare.equals(keyVal)){
+                rows.add(tuples.get(i));
+            }
+        }
+
+        return new Table(name + count++, attribute, domain, key, rows);
+    } // nonIndexSelect
 
     /************************************************************************************
      * Union this table and table2. Check that the two tables are compatible.
