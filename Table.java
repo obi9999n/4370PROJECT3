@@ -62,6 +62,10 @@ public class Table
      */
     private final List<Comparable[]> tuples;
 
+    public List<Comparable[]> getTuples() {
+        return tuples;
+    }
+
     /**
      * Primary key.
      */
@@ -166,14 +170,45 @@ public class Table
      */
     public Table project(String attributes) {
         out.println("RA> " + name + ".project (" + attributes + ")");
-        var attrs = attributes.split(" ");
-        var colDomain = extractDom(match(attrs), domain);
-        var newKey = (Arrays.asList(attrs).containsAll(Arrays.asList(key))) ? key : attrs;
+        String[] attrs = attributes.split(" ");
+        Class[] colDomain = extractDom(match(attrs), domain);
+        String[] newKey = (Arrays.asList(attrs).containsAll(Arrays.asList(key))) ? key : attrs;
 
         List<Comparable[]> rows = new ArrayList<>();
+        Map<String, Integer> m = new HashMap<String, Integer>();
 
-        // T O B E I M P L E M E N T E D
+        Map<String, Integer> attributeIdx = new HashMap<String, Integer>();
 
+        for (int a = 0; a < this.attribute.length; a++) {
+            String attributeA = this.attribute[a];
+            attributeIdx.put(attributeA, a);
+        }
+        for (int i = 0; i < this.attribute.length; i++) {
+            m.put(this.attribute[i], i);
+        }
+        // for each tuple in the designated table...
+        for (int i = 0; i < this.tuples.size(); i++) {
+            // create a new entry that has the size of the "attrs" array, representing
+            // each column in the projection
+            Comparable[] newEntry = new Comparable[attrs.length];
+            for (int j = 0; j < attrs.length; j++) {
+                // recreating the key for that tuple using KeyType and Comparable[]
+                Comparable[] keyGenerator = new Comparable[this.key.length];
+                int v = 0;
+                while (v < this.key.length) {
+                    keyGenerator[v] = this.tuples.get(i)[m.get(this.key[v])];
+                    v++;
+                }
+
+                KeyType key = new KeyType(keyGenerator);
+
+                // use that key to find the correct value using the "index" treeMap
+                newEntry[j] = index.get(key)[attributeIdx.get(attrs[j])];
+            }
+            // add the newly created entry "newEntry" to rows
+            rows.add(newEntry);
+        }
+        // use "rows" to create the newly returned table
         return new Table(name + count++, attrs, colDomain, newKey, rows);
     } // project
 
@@ -205,9 +240,14 @@ public class Table
         out.println("RA> " + name + ".select (" + keyVal + ")");
 
         List<Comparable[]> rows = new ArrayList<>();
+        // use keyVal to get correct entry from table, add it to rows
 
-        // T O B E I M P L E M E N T E D
-
+        for (Comparable[] entry : this.tuples) {
+            if (this.index.get(keyVal) == entry) {
+                rows.add(entry);
+                break;
+            }
+        }
         return new Table(name + count++, attribute, domain, key, rows);
     } // select
 
@@ -226,10 +266,39 @@ public class Table
 
         List<Comparable[]> rows = new ArrayList<>();
 
-        // T O B E I M P L E M E N T E D
+        // create set of every tuple from each table (this.Table & table2)
+        Set<Comparable[]> tableSet = new HashSet<Comparable[]>();
+        for (Comparable[] entry : this.tuples) {
+            tableSet.add(entry);
+        }
+        for (Comparable[] entry2 : table2.tuples) {
+            tableSet.add(entry2);
+        }
 
+        // duplicates are automatically handled in HashSets
+        /*
+         * add every tuple in "tableSet" to table
+         */
+        for (Comparable[] e : tableSet) {
+            rows.add(e);
+        }
         return new Table(name + count++, attribute, domain, key, rows);
     } // union
+
+    /**
+     * Worker function to compare difference for Minus compariso
+     * 
+     * @author Nkomo
+     * 
+     * @param subj      the tuple that is to be checked if exists in Diff table.
+     * @param diffTable the table that contains the list of tuples to be minused
+     */
+    private BiPredicate<Comparable[], Table> kEEP_BiPredicate = (subj, diffTable) -> {
+        return (diffTable.getTuples().stream()
+                .filter(t -> t.equals(subj))
+                .findFirst()
+                .orElse(null) != null) ? false : true;
+    };
 
     /************************************************************************************
      * Take the difference of this table and table2. Check that the two tables are
@@ -245,12 +314,35 @@ public class Table
         if (!compatible(table2))
             return null;
 
-        List<Comparable[]> rows = new ArrayList<>();
+        /*
+         * for every entry in the table2 check if the entry fulfills
+         * the kEEP_BiPredicate logic, if true, add tuple to the stream output
+         */
 
-        // T O B E I M P L E M E N T E D
-
-        return new Table(name + count++, attribute, domain, key, rows);
+        return new Table(name + count++, attribute, domain, key,
+                this.tuples.stream()
+                        .filter(t -> kEEP_BiPredicate.test(t, table2))
+                        .collect(Collectors.toList()));
     } // minus
+
+    // function for removing duplicates
+    public Comparable[] removeDups(Comparable[] arr) {
+        Map<Comparable, Integer> map = new HashMap<Comparable, Integer>();
+        for (int i = 0; i < arr.length; i++) {
+            Comparable c = arr[i];
+            if (map.containsKey(c) == false) {
+                map.put(c, i);
+            }
+        }
+
+        Comparable[] compArr = new Comparable[map.size()];
+
+        for (Map.Entry<Comparable, Integer> entry : map.entrySet()) {
+            compArr[entry.getValue()] = entry.getKey();
+        }
+
+        return compArr;
+    }
 
     /************************************************************************************
      * Join this table and table2 by performing an "equi-join". Tuples from both
@@ -272,11 +364,73 @@ public class Table
         out.println("RA> " + name + ".join (" + attributes1 + ", " + attributes2 + ", "
                 + table2.name + ")");
 
-        var t_attrs = attributes1.split(" ");
-        var u_attrs = attributes2.split(" ");
-        var rows = new ArrayList<Comparable[]>();
+        List<Comparable[]> rows = new ArrayList<>();
+        String[] a_attrs = attributes1.split(" ");
+        String[] b_attrs = attributes2.split(" ");
 
-        // T O B E I M P L E M E N T E D
+        // maps for finding key attribute indexes for dynamic key generation
+        Map<String, Integer> kA = new HashMap<String, Integer>();
+        Map<String, Integer> kB = new HashMap<String, Integer>();
+        for (int i = 0; i < this.attribute.length; i++) {
+            kA.put(this.attribute[i], i);
+        }
+
+        for (int i = 0; i < table2.attribute.length; i++) {
+            kB.put(table2.attribute[i], i);
+        }
+
+        // maps to help find index of respective attribute in table
+        Map<String, Integer> attributeIdxA = new HashMap<String, Integer>();
+        Map<String, Integer> attributeIdxB = new HashMap<String, Integer>();
+        for (int a = 0; a < this.attribute.length; a++) {
+            String attributeA = this.attribute[a];
+            attributeIdxA.put(attributeA, a);
+        }
+        for (int b = 0; b < table2.attribute.length; b++) {
+            String attributeB = table2.attribute[b];
+            attributeIdxB.put(attributeB, b);
+        }
+
+        for (int i = 0; i < this.tuples.size(); i++) {
+            // get tuple from rhs table
+            Comparable[] tupleA = this.tuples.get(i);
+            for (int j = 0; j < table2.tuples.size(); j++) {
+                // get tuple from lhs table
+                Comparable[] tupleB = table2.tuples.get(j);
+                // get keys for entry of tupleA and tupleb, dynamically genrerated
+                Comparable[] keyGeneratorA = new Comparable[this.key.length];
+                Comparable[] keyGeneratorB = new Comparable[table2.key.length];
+
+                int v = 0;
+                while (v < this.key.length) {
+                    keyGeneratorA[v] = this.tuples.get(i)[kA.get(this.key[v])];
+                    v++;
+                }
+
+                int w = 0;
+                while (w < table2.key.length) {
+                    keyGeneratorB[w] = table2.tuples.get(j)[kB.get(table2.key[w])];
+                    w++;
+                }
+                KeyType keyA = new KeyType(keyGeneratorA);
+                KeyType keyB = new KeyType(keyGeneratorB);
+
+                // check attribute predicate for each attribute array element
+                int checks = a_attrs.length;
+                int x = 0;
+                int y = 0;
+                while (x < a_attrs.length) {
+                    if (index.get(keyA)[attributeIdxA.get(a_attrs[x])] == table2.index.get(keyB)[attributeIdxB
+                            .get(b_attrs[y])]) {
+                        checks--;
+                    }
+                    x++;
+                    y++;
+                }
+                if (checks == 0)
+                    rows.add(ArrayUtil.concat(tupleA, tupleB));
+            }
+        }
 
         return new Table(name + count++, ArrayUtil.concat(attribute, table2.attribute),
                 ArrayUtil.concat(domain, table2.domain), key, rows);
@@ -328,13 +482,121 @@ public class Table
     public Table join(Table table2) {
         out.println("RA> " + name + ".join (" + table2.name + ")");
 
-        var rows = new ArrayList<Comparable[]>();
+        List<Comparable[]> rows = new ArrayList<>();
 
-        // T O B E I M P L E M E N T E D
+        // get list of attrubutes that will be compared between both tables
+        Set<String> tableattr = new HashSet<String>();
+        List<String> compareAtrributes = new ArrayList<String>();
+        for (String s : this.attribute) {
+            tableattr.add(s);
+        }
+        for (int i = 0; i < table2.attribute.length; i++) {
+            if (tableattr.contains(table2.attribute[i]))
+                compareAtrributes.add(table2.attribute[i]);
+        }
 
+        if (compareAtrributes.size() == 0)
+            return new Table(name + count++, ArrayUtil.concat(attribute, table2.attribute),
+                    ArrayUtil.concat(domain, table2.domain), key, rows);
+
+        // get new attribute list that excludes duplicates
+        for (int i = 0; i < table2.attribute.length; i++) {
+            if (!tableattr.contains(table2.attribute[i]))
+                tableattr.add(table2.attribute[i]);
+        }
+        String[] newAttr = new String[tableattr.size()];
+        int x = 0;
+
+        for (String str : this.attribute) {
+            if (tableattr.contains(str)) {
+                tableattr.remove(str);
+                newAttr[x] = str;
+            }
+            x++;
+        }
+
+        for (String strg : table2.attribute) {
+            if (tableattr.contains(strg)) {
+                newAttr[x] = strg;
+            }
+            x++;
+        }
+
+        // get new domain and key array based on "newAttr"
+        String[] newKey = (Arrays.asList(newAttr).containsAll(Arrays.asList(key))) ? key : newAttr;
+
+        // maps for finding key attribute indexes for dynamic key generation
+        Map<String, Integer> kA = new HashMap<String, Integer>();
+        Map<String, Integer> kB = new HashMap<String, Integer>();
+        for (int i = 0; i < this.attribute.length; i++) {
+            kA.put(this.attribute[i], i);
+        }
+        for (int i = 0; i < table2.attribute.length; i++) {
+            kB.put(table2.attribute[i], i);
+        }
+
+        // maps to help find index of respective attribute in table
+        Map<String, Integer> attributeIdxA = new HashMap<String, Integer>();
+        Map<String, Integer> attributeIdxB = new HashMap<String, Integer>();
+        for (int a = 0; a < this.attribute.length; a++) {
+            String attributeA = this.attribute[a];
+            attributeIdxA.put(attributeA, a);
+        }
+        for (int b = 0; b < table2.attribute.length; b++) {
+            String attributeB = table2.attribute[b];
+            attributeIdxB.put(attributeB, b);
+        }
+
+        for (int i = 0; i < this.tuples.size(); i++) {
+            // get tuple from rhs table
+            Comparable[] tupleA = this.tuples.get(i);
+            for (int j = 0; j < table2.tuples.size(); j++) {
+                // get tuple from lhs table
+                Comparable[] tupleB = table2.tuples.get(j);
+                // get keys for entry of tupleA and tupleb, dynamically genrerated
+                Comparable[] keyGeneratorA = new Comparable[this.key.length];
+                Comparable[] keyGeneratorB = new Comparable[table2.key.length];
+                int v = 0;
+                while (v < this.key.length) {
+                    keyGeneratorA[v] = this.tuples.get(i)[kA.get(this.key[v])];
+                    v++;
+                }
+                int w = 0;
+                while (w < table2.key.length) {
+                    keyGeneratorB[w] = table2.tuples.get(j)[kB.get(table2.key[w])];
+                    w++;
+                }
+                KeyType keyA = new KeyType(keyGeneratorA);
+                KeyType keyB = new KeyType(keyGeneratorB);
+
+                // check attribute predicate for each attribute array element
+                int checks = compareAtrributes.size();
+                int z = 0;
+                while (z < compareAtrributes.size()) {
+                    if (index.get(keyA)[attributeIdxA.get(compareAtrributes.get(z))] == table2.index
+                            .get(keyB)[attributeIdxB
+                                    .get(compareAtrributes.get(z))]) {
+                        checks--;
+                    }
+                    z++;
+                }
+                if (checks == 0)
+                    rows.add(removeDups(ArrayUtil.concat(tupleA, tupleB)));
+            }
+        }
+
+        String[] finalAttribute = new String[compareAtrributes.size()];
+        int t = 0;
+
+        for (String c : compareAtrributes) {
+            finalAttribute[t] = c;
+            t++;
+        }
+
+        Class[] colDomain = extractDom(match(finalAttribute), domain);
         // FIX - eliminate duplicate columns
-        return new Table(name + count++, ArrayUtil.concat(attribute, table2.attribute),
-                ArrayUtil.concat(domain, table2.domain), key, rows);
+        return new Table(name + count++, newAttr,
+                colDomain, newKey, rows);
     } // join
 
     /************************************************************************************
