@@ -36,7 +36,7 @@
 
 
 
-/************************************************************************************
+    /************************************************************************************
      * Join this table and table2 by performing an "equi-join".  Tuples from both tables
      * are compared requiring attributes1 to equal attributes2.  Disambiguate attribute
      * names by append "2" to the end of any duplicate attribute name.

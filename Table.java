@@ -159,6 +159,30 @@ public class Table
     // Public Methods
     // ----------------------------------------------------------------------------------
 
+
+/************************************************************************************
+     * Project the tuples onto a lower dimension by keeping only the given
+     * attributes.
+     * Check whether the original key is included in the projection.
+     *
+     * #usage movie.project ("title year studioNo")
+     *
+     * @param attributes the attributes to project onto
+     * @return a table of projected tuples
+     */
+    public Table project1(String attributes) {
+        out.println("RA> " + name + ".project (" + attributes + ")");
+        var attrs = attributes.split(" ");
+        var colDomain = extractDom(match(attrs), domain);
+        var newKey = (Arrays.asList(attrs).containsAll(Arrays.asList(key))) ? key : attrs;
+
+        List<Comparable[]> rows = new ArrayList<>();
+
+        // T O B E I M P L E M E N T E D
+
+        return new Table(name + count++, attrs, colDomain, newKey, rows);
+    } // project
+
     /************************************************************************************
      * Project the tuples onto a lower dimension by keeping only the given
      * attributes.
@@ -169,42 +193,65 @@ public class Table
      * @param attributes the attributes to project onto
      * @return a table of projected tuples
      */
-    public Table project(String attributes) {
+    /************************************************************************************
+     * Project the tuples onto a lower dimension by keeping only the given
+     * attributes.
+     * Check whether the original key is included in the projection.
+     *
+     * #usage movie.project ("title year studioNo")
+     *
+     * @param attributes the attributes to project onto
+     * @return a table of projected tuples
+     */
+    public Table project(String attributes) 
+    {
         out.println("RA> " + name + ".project (" + attributes + ")");
+
         String[] attrs = attributes.split(" ");
         Class[] colDomain = extractDom(match(attrs), domain);
         String[] newKey = (Arrays.asList(attrs).containsAll(Arrays.asList(key))) ? key : attrs;
 
         List<Comparable[]> rows = new ArrayList<>();
-        Map<String, Integer> m = new HashMap<String, Integer>();
 
-        Map<String, Integer> attributeIdx = new HashMap<String, Integer>();
-
-        for (int a = 0; a < this.attribute.length; a++) {
-            String attributeA = this.attribute[a];
-            attributeIdx.put(attributeA, a);
+        // hold the index for key columns
+        Map<String, Integer> keyAttribByIndx = new HashMap<String, Integer>();
+        for (int i = 0; i < newKey.length; i++) {
+            for (int j = 0; j < this.attribute.length; j++) {
+                if (this.attribute[j].equals(newKey[i])) {
+                    keyAttribByIndx.put(newKey[i], j);
+                }
+            }
         }
+        // hold the index for attribute columns
+        Map<String, Integer> attributeByIndx = new HashMap<String, Integer>();
         for (int i = 0; i < this.attribute.length; i++) {
-            m.put(this.attribute[i], i);
+            attributeByIndx.put(this.attribute[i], i);
         }
         // for each tuple in the designated table...
         for (int i = 0; i < this.tuples.size(); i++) {
             // create a new entry that has the size of the "attrs" array, representing
             // each column in the projection
             Comparable[] newEntry = new Comparable[attrs.length];
+            Comparable[] keyGenerator = new Comparable[newKey.length];
+
+            int tupleColIndx = -1;
+            int keyGeneratorIndx = 0;
+            var tupleAsSubj = this.tuples.get(i);
+            while (tupleColIndx++ < tupleAsSubj.length) {
+                if (!keyAttribByIndx.containsValue(tupleColIndx)) continue;
+                keyGenerator[keyGeneratorIndx++] = tupleAsSubj[tupleColIndx];
+            }
+
+            KeyType key = new KeyType(keyGenerator);
+
+            // populate the tuple
             for (int j = 0; j < attrs.length; j++) {
-                // recreating the key for that tuple using KeyType and Comparable[]
-                Comparable[] keyGenerator = new Comparable[this.key.length];
-                int v = 0;
-                while (v < this.key.length) {
-                    keyGenerator[v] = this.tuples.get(i)[m.get(this.key[v])];
-                    v++;
+                if (attributeByIndx.containsKey(attrs[j])) {
+                    var attrIndx = attributeByIndx.get(attrs[j]);
+                    newEntry[j] = tupleAsSubj[attrIndx];
+                } else {
+                    newEntry[j] = null;
                 }
-
-                KeyType key = new KeyType(keyGenerator);
-
-                // use that key to find the correct value using the "index" treeMap
-                newEntry[j] = index.get(key)[attributeIdx.get(attrs[j])];
             }
             // add the newly created entry "newEntry" to rows
             rows.add(newEntry);
@@ -393,6 +440,9 @@ public class Table
     public Table join(String attributes1, String attributes2, Table table2) {
         out.println("RA> " + name + ".join (" + attributes1 + ", " + attributes2 + ", "
                 + table2.name + ")");
+        if (mType == MapType.NO_MAP) {
+            return doNoMapJoin(attributes1, attributes2, table2);
+        }
 
         List<Comparable[]> rows = new ArrayList<>();
         String[] a_attrs = attributes1.split(" ");
@@ -465,6 +515,80 @@ public class Table
         return new Table(name + count++, ArrayUtil.concat(attribute, table2.attribute),
                 ArrayUtil.concat(domain, table2.domain), key, rows);
     } // join
+
+    /************************************************************************************
+     * Join this table and table2 by performing an "equi-join".  Tuples from both tables
+     * are compared requiring attributes1 to equal attributes2.  Disambiguate attribute
+     * names by append "2" to the end of any duplicate attribute name.
+     *
+     * @author  Lin Zhao
+     *
+     * #usage movie.join ("studioNo", "name", studio)
+     *
+     * @param attribute1  the attributes of this table to be compared (Foreign Key)
+     * @param attribute2  the attributes of table2 to be compared (Primary Key)
+     * @param table2      the rhs table in the join operation
+     * @return  a table with tuples satisfying the equality predicate
+     */
+    public Table doNoMapJoin(String attributes1, String attributes2, Table table2)
+    {
+        out.println ("RA> " + name + ".join (" + attributes1 + ", " + attributes2 + ", "
+                                               + table2.name + ")");
+
+        String [] t_attrs = attributes1.split (" ");
+        String [] u_attrs = attributes2.split (" ");
+
+        List <Comparable []> rows = new ArrayList <> ();
+
+		if (t_attrs.length != u_attrs.length) {
+			System.out.println("Cannot Perform Join Operator");
+			return null;
+		}
+ 		
+		for (Comparable[] tuple1 : tuples) {
+			for (Comparable[] tuple2 : table2.tuples) {
+				
+			    Comparable[] Attri1 = this.extract(tuple1, t_attrs);
+			    Comparable[] Attri2 = table2.extract(tuple2, u_attrs);
+			
+			    boolean flag = true;
+			    
+				// Judge if attributes1 in table1 is equal to attributes2 in table 2
+			    for (int i = 0; i < Attri1.length; i++) {
+				
+				    if (!Attri1[i].equals(Attri2[i])) {
+						flag = false;
+						break;
+					}
+				}
+
+				// Concatenate tuples from table1&2 to form a new tuple
+			    if (flag) {
+				    Comparable[] join_tuple = ArrayUtil.concat(tuple1, tuple2);
+				    rows.add(join_tuple);
+				}
+			}
+		}
+
+		// Disambiguate attribute names by append "2" to the end of any duplicate attribute name.
+		// Here we just need to rename the attribute names in table2 then concatenate them to those in table1 
+		String[] attribute2_new = table2.attribute;
+		
+		for (int j = 0; j < t_attrs.length; j++) {
+			for (int k = 0; k < attribute2_new.length; ++k) {
+				
+				if (attribute2_new[k].equals(t_attrs[j])) {
+					
+					String tmp_attri = t_attrs[j] + "2"; 
+					attribute2_new[j] = tmp_attri;
+				}
+			}
+		}
+		
+
+		return new Table (name + count++, ArrayUtil.concat (attribute, attribute2_new),
+				ArrayUtil.concat (domain, table2.domain), key, rows);
+	} // doNoMapJoin
 
     /************************************************************************************
      * Join this table and table2 by performing an "equi-join". Same as above, but
