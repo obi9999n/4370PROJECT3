@@ -86,12 +86,13 @@ public class Table
     /**
      * The map type to be used for indices. Change as needed.
      */
-    private static final MapType mType = MapType.NO_MAP;
+    private static final MapType mType = MapType.LINHASH_MAP;
 
     /************************************************************************************
      * Make a map (index) given the MapType.
      */
     private static Map<KeyType, Comparable[]> makeMap() {
+        out.println(mType);
         return switch (mType) {
             case HASH_MAP -> new HashMap<>();
             case TREE_MAP -> new TreeMap<>();
@@ -438,7 +439,7 @@ public class Table
      * @return a table with tuples satisfying the equality predicate
      */
     public Table join(String attributes1, String attributes2, Table table2) {
-        out.println("RA> " + name + ".join (" + attributes1 + ", " + attributes2 + ", "
+        out.println("RA>q " + name + ".join (" + attributes1 + ", " + attributes2 + ", "
                 + table2.name + ")");
         if (mType == MapType.NO_MAP) {
             return doNoMapJoin(attributes1, attributes2, table2);
@@ -532,8 +533,8 @@ public class Table
      */
     public Table doNoMapJoin(String attributes1, String attributes2, Table table2)
     {
-        out.println ("RA> " + name + ".join (" + attributes1 + ", " + attributes2 + ", "
-                                               + table2.name + ")");
+        // out.println ("RA> " + name + ".join (" + attributes1 + ", " + attributes2 + ", "
+        //                                        + table2.name + ")");
 
         String [] t_attrs = attributes1.split (" ");
         String [] u_attrs = attributes2.split (" ");
