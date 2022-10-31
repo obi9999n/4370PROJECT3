@@ -191,7 +191,7 @@ public class LinHashMap<K, V>
           // end modification
         var bh = hTable.get(i); // start with home bucket
         var oldV = find(key, bh, false); // find old value associated with key
-        out.println("LinearHashMap.put: key = " + key + ", h() = " + i + ", value = " + value);
+        // out.println("LinearHashMap.put: key = " + key + ", h() = " + i + ", value = " + value);
 
         keyCount++; // increment the key count
         var lf = loadFactor(); // compute the load factor
@@ -286,14 +286,14 @@ public class LinHashMap<K, V>
                 if (x != isplit) {
                     while (change == false) {
                         if (startB.nKeys < SLOTS) {
-                            System.out.println(bucketToSplit.key[j] + " moved");
+                            // System.out.println(bucketToSplit.key[j] + " moved");
                             startB.add(bucketToSplit.key[j], oldV);
                             change = true;
                         } else if (startB.next != null)
                             // move to the next bucket if current one is full
                             startB = startB.next;
                         else {
-                            System.out.println(bucketToSplit.key[j] + " moved");
+                            // System.out.println(bucketToSplit.key[j] + " moved");
                             newBucket.add(bucketToSplit.key[j], oldV);
                             change = true;
                             startB.next = newBucket; // add new bucket at end of chain
@@ -358,7 +358,7 @@ public class LinHashMap<K, V>
      * @return the location of the bucket chain containing the key-value pair
      */
     private int h(Object key) {
-        return key.hashCode() % mod1;
+        return Math.abs(key.hashCode()) % mod1;
     } // h
 
     /********************************************************************************
@@ -368,7 +368,7 @@ public class LinHashMap<K, V>
      * @return the location of the bucket chain containing the key-value pair
      */
     private int h2(Object key) {
-        return key.hashCode() % mod2;
+        return Math.abs(key.hashCode()) % mod2;
     } // h2
 
     /********************************************************************************

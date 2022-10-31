@@ -144,6 +144,12 @@ class MovieDB {
         Table t_project = movie.project("title year genre");
         t_project.print();
 
+        // --------------------- project: title 
+
+        out.println();
+        Table t_project2 = movie.project("title");
+        t_project2.print();
+
         // --------------------- select: equals, &&
 
         out.println();
@@ -216,12 +222,12 @@ class MovieDB {
         // --------------------- natural join: movie JOIN studio
 
         out.println();
-        Table t_join2 = movie.join(cinema);
-        t_join2.print();
+        // Table t_join2 = movie.join(cinema);
+        // t_join2.print();
 
         out.println();
-        Table t_join3 = movieExec.join(starsIn);
-        t_join3.print();
+        // Table t_join3 = movieExec.join(starsIn);
+        // t_join3.print();
 
     } // main
 
